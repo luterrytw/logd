@@ -66,7 +66,9 @@ SOCKET init_server_udp_socket(char* ip, int port, int is_nonblocking, struct add
 
     result = bind(sock, (*listenAddr)->ai_addr, (*listenAddr)->ai_addrlen);
 	SOCKET_RESULT_GOTO_ERROR(result, "bind() failed");
-
+	if(*listenAddr) {
+		freeaddrinfo(*listenAddr);
+	}
     return sock;
 
 error:

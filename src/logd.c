@@ -56,7 +56,7 @@ typedef struct {
 
 static LOGD_CONFIG g_logdConfig;
 static LOGD_STATUS g_logdStatus;
-static char* g_message = NULL;
+static char* g_buffer = NULL;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Log Rotation
@@ -430,8 +430,8 @@ static int read_log_config(char* filename)
 		if ((ptr = get_config_value(line, "max_msg_size")) != NULL) {
 			g_logdConfig.maxMsgSize = strtol(ptr, NULL, 10);
 			LOGDD("config: max_msg_size=%d", g_logdConfig.maxMsgSize);
-			if (g_message) free(g_message);
-			g_message = (char*) malloc(g_logdConfig.maxMsgSize);
+			if (g_buffer) free(g_buffer);
+			g_buffer = (char*) malloc(g_logdConfig.maxMsgSize);
 			continue;
 		}
 	}
@@ -631,6 +631,10 @@ static int uninit_logd()
 		fclose(g_logdStatus.logFP);
 		g_logdStatus.logFP = NULL;
 	}
+	
+	if (g_buffer) {
+		free(g_buffer);
+	}
 	return 0;
 }
 
@@ -663,7 +667,7 @@ static int init_logd()
 	// init variable
 	g_logdStatus.isRun = 1;
 	g_logdStatus.logSize = 0;
-	g_message = (char*) malloc(g_logdConfig.maxMsgSize);
+	g_buffer = (char*) malloc(g_logdConfig.maxMsgSize);
 	
 	// init & start log listener
 	g_logdStatus.listenSocket = init_server_udp_socket(NULL, g_logdConfig.logdPort, 1, &listenAddr);
@@ -699,28 +703,28 @@ static void termination(int sig)
 
 static int do_writelog()
 {
-	char buffer[LOGD_MAX_BUF_LEN];
-	char *message = buffer + sizeof(int32_t) + sizeof(int32_t); // skip header
+	char *message = g_buffer + sizeof(int32_t) + sizeof(int32_t); // skip header
 	int bytes;
 	int32_t length, magic = 0;
 
 	while (1) {
-		buffer[0] = '\0';
-		bytes = read_udp_message(g_logdStatus.listenSocket, (unsigned char*) buffer, sizeof(buffer));
+		g_buffer[0] = '\0';
+		bytes = read_udp_message(g_logdStatus.listenSocket, (unsigned char*) g_buffer, g_logdConfig.maxMsgSize);
 		SOCKET_RESULT_GOTO_ERROR(bytes, "read_udp_message_ex() failed");
 		if (bytes == 0) { // no more data
 			break;
 		}
 		if (bytes < sizeof(int32_t) + sizeof(int32_t)) {
-			continue; // invalid buffer, read next
+			continue; // invalid g_buffer, read next
 		}
-		memcpy(&magic, buffer, sizeof(int32_t));
+		memcpy(&magic, g_buffer, sizeof(int32_t));
 		if (magic != LOG_MAGIC_NUMBER) {
-			continue; // invalid buffer, read next
+			continue; // invalid g_buffer, read next
 		}
-		memcpy(&length, buffer + sizeof(int32_t), sizeof(int32_t));
-		if ((length + sizeof(int32_t) + sizeof(int32_t)) != bytes) {
-			continue; // invalid buffer, read next
+		memcpy(&length, g_buffer + sizeof(int32_t), sizeof(int32_t));
+		if ((length + sizeof(int32_t) + sizeof(int32_t)) >= bytes) {
+			g_buffer[g_logdConfig.maxMsgSize-1] = '\0';
+			// truncated!
 		}
 
 		g_logdStatus.logSize += strlen(message) + 1;
