@@ -30,6 +30,7 @@ typedef struct {
 	int maxLogSize;
 	int logdPort;
 	int flushTime; // sec., timeout time to do flush log
+	int maxMsgSize;
 } LOGD_CONFIG;
 
 typedef int (*task_act)(void *user_data);
@@ -55,6 +56,7 @@ typedef struct {
 
 static LOGD_CONFIG g_logdConfig;
 static LOGD_STATUS g_logdStatus;
+static char* g_message = NULL;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Log Rotation
@@ -425,6 +427,13 @@ static int read_log_config(char* filename)
 			LOGDD("config: logd_port=%d", g_logdConfig.logdPort);
 			continue;
 		}
+		if ((ptr = get_config_value(line, "max_msg_size")) != NULL) {
+			g_logdConfig.maxMsgSize = strtol(ptr, NULL, 10);
+			LOGDD("config: max_msg_size=%d", g_logdConfig.maxMsgSize);
+			if (g_message) free(g_message);
+			g_message = (char*) malloc(g_logdConfig.maxMsgSize);
+			continue;
+		}
 	}
 	fclose(file);
 
@@ -639,6 +648,7 @@ static int init_logd()
 	g_logdConfig.maxLogSize = DEF_MAX_LOG_SIZE;
 	g_logdConfig.flushTime = 60; // default 60sec.
 	g_logdConfig.logdPort = DEF_LOGD_PORT;
+	g_logdConfig.maxMsgSize = LOGD_MAX_BUF_LEN;
 	util_module_path_get(moudlePath);
 	sprintf(g_logdConfig.logPath, "%s%c%s", moudlePath, FILE_SEPARATOR, DEF_LOG_PATH);
 
@@ -653,7 +663,7 @@ static int init_logd()
 	// init variable
 	g_logdStatus.isRun = 1;
 	g_logdStatus.logSize = 0;
-	
+	g_message = (char*) malloc(g_logdConfig.maxMsgSize);
 	
 	// init & start log listener
 	g_logdStatus.listenSocket = init_server_udp_socket(NULL, g_logdConfig.logdPort, 1, &listenAddr);
