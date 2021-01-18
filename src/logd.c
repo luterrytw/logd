@@ -155,9 +155,9 @@ static void get_datetime_str(time_t timer, char *datetimeStr)
 #ifdef DEBUG
 static void dump_log_file_info(LOG_FILE_INFO *info)
 {
-	fprintf(stderr, "counter=%d\n", info->counter);
-	fprintf(stderr, "firstDatetime=%lu\n", info->firstDatetime);
-	fprintf(stderr, "lastDatetime=%lu\n", info->lastDatetime);
+	LOGDD("counter=%d\n", info->counter);
+	LOGDD("firstDatetime=%lu\n", info->firstDatetime);
+	LOGDD("lastDatetime=%lu\n", info->lastDatetime);
 }
 #endif
 
@@ -220,7 +220,7 @@ static int log_rotation()
 	// remove first log file
 	LOGDD("try to remove(%s)", firstLogFile);
 	if (firstLogFile[0] != '\0' && remove(firstLogFile)) {
-		fprintf(stderr, "Remove %s fail, return\n", firstLogFile);
+		LOGDD("Remove %s fail, return\n", firstLogFile);
 		return -1;
 	}
 
@@ -233,7 +233,7 @@ static int log_rotation()
 	g_logdStatus.logFP = fopen(nextLogFile, "w");
 	LOGDD("try to open(%s)", nextLogFile);
 	if (g_logdStatus.logFP == NULL) {
-		fprintf(stderr, "open %s fail, errno=%d\n", nextLogFile, errno);
+		LOGDD("open %s fail, errno=%d\n", nextLogFile, errno);
 		return -1;
 	}
 	g_logdStatus.logSize = 0;
@@ -439,6 +439,7 @@ static int read_log_config(char* filename)
 
 	if (!isValid) {
 		LOGDD("%s format is invalid", filename);
+		append_empty_logini(filename);
 	}
 	return 0;
 }
@@ -609,6 +610,7 @@ static int task_flush_log(void *user_data)
 		fflush(g_logdStatus.logFP);
 	}
 	add_task(&g_logdStatus.taskList, task_flush_log, user_data, g_logdConfig.flushTime*1000);
+
 	return 0;
 }
 
@@ -654,7 +656,7 @@ static int init_logd()
 	g_logdConfig.logdPort = DEF_LOGD_PORT;
 	g_logdConfig.maxMsgSize = LOGD_MAX_BUF_LEN;
 	util_module_path_get(moudlePath);
-	sprintf(g_logdConfig.logPath, "%s%c%s", moudlePath, FILE_SEPARATOR, DEF_LOG_PATH);
+	snprintf(g_logdConfig.logPath, sizeof(g_logdConfig.logPath)-1, "%.4069s%c%.4s", moudlePath, FILE_SEPARATOR, DEF_LOG_PATH);
 
 	// load config
 	snprintf(filename, sizeof(filename)-1, "%.4086s%c%.7s", moudlePath, FILE_SEPARATOR, "log.ini");
