@@ -15,6 +15,7 @@
 
 #define DEF_LOGD_PORT		9278
 #define LOGD_MAX_BUF_LEN	2048
+#define LOG_MAGIC_NUMBER	0x243E2537
 
 #ifndef LOG_TAG
 	#define LOG_TAG	""

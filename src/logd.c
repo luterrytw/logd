@@ -205,12 +205,14 @@ static int log_rotation()
 	
 	// make next log file
 	get_datetime_str(curDatetime, datetimeStr); // get current date time string
-	sprintf(nextLogFile, "%s%c%s_logd.txt", g_logdConfig.logPath, FILE_SEPARATOR, datetimeStr);
+	snprintf(nextLogFile, sizeof(nextLogFile)-1, "%.4069s%c%.15s_logd.txt", g_logdConfig.logPath, FILE_SEPARATOR, datetimeStr);
+	nextLogFile[PATH_MAX-1] = '\0';
 	
 	// make first log file
 	if (info.counter >= DEF_MAX_LOG_NUM) {
 		get_datetime_str(info.firstDatetime, datetimeStr); // get first date time string
-		sprintf(firstLogFile, "%s%c%s_logd.txt", g_logdConfig.logPath, FILE_SEPARATOR, datetimeStr);
+		snprintf(firstLogFile, sizeof(firstLogFile)-1, "%.4069s%c%.15s_logd.txt", g_logdConfig.logPath, FILE_SEPARATOR, datetimeStr);
+		firstLogFile[PATH_MAX-1] = '\0';
 	}
 
 	// remove first log file
@@ -636,7 +638,8 @@ static int init_logd()
 	sprintf(g_logdConfig.logPath, "%s%c%s", moudlePath, FILE_SEPARATOR, DEF_LOG_PATH);
 
 	// load config
-	sprintf(filename, "%s%c%s", moudlePath, FILE_SEPARATOR, "log.ini");
+	snprintf(filename, sizeof(filename)-1, "%.4086s%c%.7s", moudlePath, FILE_SEPARATOR, "log.ini");
+	filename[PATH_MAX-1] = '\0';
 	read_log_config(filename);
 	
 	// carete logs folder
@@ -681,16 +684,35 @@ static void termination(int sig)
 
 static int do_writelog()
 {
-	char message[LOGD_MAX_BUF_LEN];
+	char buffer[LOGD_MAX_BUF_LEN];
+	char *message = buffer + sizeof(int32_t) + sizeof(int32_t); // skip header
 	int bytes;
+	int32_t length, magic = 0;
 
 	while (1) {
-		message[0] = '\0';
-		bytes = read_udp_message_ex(g_logdStatus.listenSocket, (unsigned char*) message, sizeof(message));
+		buffer[0] = '\0';
+		bytes = read_udp_message(g_logdStatus.listenSocket, (unsigned char*) buffer, sizeof(buffer));
+fprintf(stderr, "ttt 1, bytes=%d\n", bytes);
 		SOCKET_RESULT_GOTO_ERROR(bytes, "read_udp_message_ex() failed");
 		if (bytes == 0) { // no more data
 			break;
 		}
+fprintf(stderr, "ttt 2\n");
+		if (bytes < sizeof(int32_t) + sizeof(int32_t)) {
+			continue; // invalid buffer, read next
+		}
+fprintf(stderr, "ttt 3\n");
+		memcpy(&magic, buffer, sizeof(int32_t));
+		if (magic != LOG_MAGIC_NUMBER) {
+			continue; // invalid buffer, read next
+		}
+		memcpy(&length, buffer + sizeof(int32_t), sizeof(int32_t));
+fprintf(stderr, "ttt 4, length=%d, bytes=%d\n", length + sizeof(int32_t) + sizeof(int32_t)	, bytes);
+		if ((length + sizeof(int32_t) + sizeof(int32_t)) != bytes) {
+			continue; // invalid buffer, read next
+		}
+
+fprintf(stderr, "ttt 5\n");
 		g_logdStatus.logSize += strlen(message) + 1;
 		if (g_logdStatus.logSize > g_logdConfig.maxLogSize) {
 			log_rotation();
