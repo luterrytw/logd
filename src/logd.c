@@ -356,11 +356,16 @@ static int append_empty_logini(char* filename)
 	}
 
 	fputs("\n" LOGD_INI_GROUP "\n", file);
-	fputs("#log_path=exe_path/logs\n", file);
-	fputs("#max_log_num=10, the max log number to rotation\n", file);
-	fputs("#max_log_size=10485760, the max size per log file in bytes, 10485760 = 10M = 10*1024*1024\n", file);
-	fputs("#logd_port=9278\n", file);
-	fputs("#flush_time=60, sec., for debugging, you can set flush time to 1sec.\n", file);
+	fputs("#log_path=exe_path/logs\n\n", file);
+	fputs("#the max log number to rotation\n", file);
+	fputs("#max_log_num=10\n\n", file);
+	fputs("#the max size per log file in bytes, 10485760 = 10M = 10*1024*1024\n", file);
+	fputs("#max_log_size=10485760\n\n", file);
+	fputs("#logd_port=9278\n\n", file);
+	fputs("#sec., for debugging, you can set flush time to 1sec.\n", file);
+	fputs("#flush_time=60\n\n", file);
+	fputs("#max length per message.\n", file);
+	fprintf(file, "#max_msg_size=%d\n\n", LOGD_MAX_BUF_LEN);
 
 	fclose(file);
 	return 0;
@@ -692,27 +697,22 @@ static int do_writelog()
 	while (1) {
 		buffer[0] = '\0';
 		bytes = read_udp_message(g_logdStatus.listenSocket, (unsigned char*) buffer, sizeof(buffer));
-fprintf(stderr, "ttt 1, bytes=%d\n", bytes);
 		SOCKET_RESULT_GOTO_ERROR(bytes, "read_udp_message_ex() failed");
 		if (bytes == 0) { // no more data
 			break;
 		}
-fprintf(stderr, "ttt 2\n");
 		if (bytes < sizeof(int32_t) + sizeof(int32_t)) {
 			continue; // invalid buffer, read next
 		}
-fprintf(stderr, "ttt 3\n");
 		memcpy(&magic, buffer, sizeof(int32_t));
 		if (magic != LOG_MAGIC_NUMBER) {
 			continue; // invalid buffer, read next
 		}
 		memcpy(&length, buffer + sizeof(int32_t), sizeof(int32_t));
-fprintf(stderr, "ttt 4, length=%d, bytes=%d\n", length + sizeof(int32_t) + sizeof(int32_t)	, bytes);
 		if ((length + sizeof(int32_t) + sizeof(int32_t)) != bytes) {
 			continue; // invalid buffer, read next
 		}
 
-fprintf(stderr, "ttt 5\n");
 		g_logdStatus.logSize += strlen(message) + 1;
 		if (g_logdStatus.logSize > g_logdConfig.maxLogSize) {
 			log_rotation();
